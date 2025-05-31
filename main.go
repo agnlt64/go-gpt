@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	DEFAULT_SYSTEM_PROMPT = "You are a terminal-based chat assistant. Give relatively short answers, while being as accurate as possible.\n"
+	DEFAULT_SYSTEM_PROMPT = "You are a terminal-based chat assistant. Give relatively short answers, while being as accurate as possible."
 )
 
 func main() {
@@ -49,23 +49,26 @@ REPL:
 				fmt.Println("Goodbye!")
 				break REPL
 			case "embed":
-				if len(commandArgs) != 2 {
-					fmt.Println("Error: `/embed <file>` command expects a single file name")
-					continue
-				}
-				fileName := commandArgs[1]
-				content, err := os.ReadFile(fileName)
-				if err != nil {
-					fmt.Printf("Error: can't read file `%s`\n", fileName)
+				if len(commandArgs) < 2 {
+					fmt.Println("Error: `/embed <file>` command expects at least a file name")
 					continue
 				}
 
-				sb := strings.Builder{}
-				sb.WriteString(fmt.Sprintf("File `%s`:\n", fileName))
-				sb.Write(content)
-				systemPrompt += sb.String()
-
-				fmt.Printf("Added `%s` to system prompt\n", fileName)
+				for idx := range len(commandArgs) - 1 {
+					fileName := commandArgs[idx + 1]
+					content, err := os.ReadFile(fileName)
+					if err != nil {
+						fmt.Printf("Error: can't read file `%s`\n", fileName)
+						continue
+					}
+	
+					sb := strings.Builder{}
+					sb.WriteString(fmt.Sprintf("\nFile `%s`:\n", fileName))
+					sb.Write(content)
+					systemPrompt += sb.String()
+	
+					fmt.Printf("Added `%s` to system prompt\n", fileName)
+				}
 			case "system":
 				if len(commandArgs) != 2 {
 					fmt.Println("Error: `/system <option>` command expects `show`, or `reset`")
@@ -76,6 +79,7 @@ REPL:
 					fmt.Println(systemPrompt)
 				case "reset":
 					systemPrompt = DEFAULT_SYSTEM_PROMPT
+					fmt.Println("System prompt has been reset")
 				}
 			case "help":
 				fmt.Println("Help:")
