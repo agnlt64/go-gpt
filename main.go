@@ -12,6 +12,10 @@ import (
 	"github.com/joho/godotenv"
 )
 
+const (
+	DEFAULT_SYSTEM_PROMPT = "You are a terminal-based chat assistant. Give relatively short answers, while being as accurate as possible.\n"
+)
+
 func main() {
 	err := godotenv.Load()
 	if err != nil {
@@ -21,6 +25,7 @@ func main() {
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	client := openai.NewClient(apiKey)
 	running := true
+	systemPrompt := DEFAULT_SYSTEM_PROMPT
 
 	fmt.Println("GPT Client in Go")
 	REPL: for running {
@@ -48,12 +53,29 @@ func main() {
 				}
 				fileName := commandArgs[1]
 				// TODO: extract file content and add it to system prompt.
-				_, err := os.ReadFile(fileName)
+				content, err := os.ReadFile(fileName)
 				if err != nil {
 					fmt.Printf("Error: can't read file `%s`\n", fileName)
 					continue
 				}
+
+				sb := strings.Builder{}
+				sb.WriteString(fmt.Sprintf("File `%s`:\n", fileName))
+				sb.Write(content)
+				systemPrompt += sb.String()
+
 				fmt.Printf("Added `%s` to system prompt\n", fileName)
+			case "system":
+				if len(commandArgs) != 2 {
+					fmt.Println("Error: `/system <option>` command expects `show`, or `reset`")
+					continue
+				}
+				switch commandArgs[1] {
+				case "show":
+					fmt.Println(systemPrompt)
+				case "reset":
+					systemPrompt = DEFAULT_SYSTEM_PROMPT
+				}
 			default:
 				fmt.Printf("Error: `%s` is not a valid REPL command\n", commandArgs[0])
 			}
@@ -63,6 +85,7 @@ func main() {
 				openai.ChatCompletionRequest{
 					Model: openai.GPT4oMini,
 					Messages: []openai.ChatCompletionMessage{
+						{Role: openai.ChatMessageRoleSystem, Content: systemPrompt},
 						{Role: openai.ChatMessageRoleAssistant, Content: line},
 					},
 				},
