@@ -1,15 +1,15 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"log"
-	"bufio"
 	"os"
 	"strings"
 
-	"github.com/sashabaranov/go-openai"
 	"github.com/joho/godotenv"
+	"github.com/sashabaranov/go-openai"
 )
 
 const (
@@ -27,8 +27,10 @@ func main() {
 	running := true
 	systemPrompt := DEFAULT_SYSTEM_PROMPT
 
-	fmt.Println("GPT Client in Go")
-	REPL: for running {
+	fmt.Println("GPT Client in Go. Use `/help` for help.")
+
+REPL:
+	for running {
 		fmt.Print("> ")
 		input := bufio.NewReader(os.Stdin)
 		line, err := input.ReadString('\n')
@@ -36,7 +38,7 @@ func main() {
 		if err != nil {
 			log.Fatalf("Erreur de lecture de l'entrée: %v", err)
 		}
-		
+
 		line = strings.TrimSuffix(line, "\n")
 
 		if line[0] == '/' {
@@ -52,7 +54,6 @@ func main() {
 					continue
 				}
 				fileName := commandArgs[1]
-				// TODO: extract file content and add it to system prompt.
 				content, err := os.ReadFile(fileName)
 				if err != nil {
 					fmt.Printf("Error: can't read file `%s`\n", fileName)
@@ -76,26 +77,41 @@ func main() {
 				case "reset":
 					systemPrompt = DEFAULT_SYSTEM_PROMPT
 				}
+			case "help":
+				fmt.Println("Help:")
+				fmt.Println("    /system <show | reset> Manipulate the system prompt")
+				fmt.Println("    /embed <file>          Embed a file into the system prompt")
+				fmt.Println("    /help                  Display this help")
+				fmt.Println("    /exit                  Exit the REPL")
 			default:
 				fmt.Printf("Error: `%s` is not a valid REPL command\n", commandArgs[0])
 			}
 		} else {
-			resp, err := client.CreateChatCompletion(
-				context.Background(),
-				openai.ChatCompletionRequest{
-					Model: openai.GPT4oMini,
-					Messages: []openai.ChatCompletionMessage{
-						{Role: openai.ChatMessageRoleSystem, Content: systemPrompt},
-						{Role: openai.ChatMessageRoleAssistant, Content: line},
-					},
+			req := openai.ChatCompletionRequest{
+				Model: openai.GPT4oMini,
+				Messages: []openai.ChatCompletionMessage{
+					{Role: openai.ChatMessageRoleSystem, Content: systemPrompt},
+					{Role: openai.ChatMessageRoleAssistant, Content: line},
 				},
-			)
-	
-			if err != nil {
-				log.Fatalf("Erreur API: %v", err)
+				Stream: true,
 			}
-	
-			fmt.Println(resp.Choices[0].Message.Content)
+			stream, err := client.CreateChatCompletionStream(context.Background(), req)
+			if err != nil {
+				fmt.Printf("ChatCompletionStream error: %v\n", err)
+				return
+			}
+
+			for {
+				response, err := stream.Recv()
+
+				if err != nil {
+					break
+				}
+
+				fmt.Printf(response.Choices[0].Delta.Content)
+			}
+			stream.Close()
+			fmt.Println()
 		}
 	}
 }
