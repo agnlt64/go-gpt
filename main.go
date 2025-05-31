@@ -31,6 +31,8 @@ func main() {
 
 REPL:
 	for running {
+		// TODO: add better prompt with readline
+		// github.com/chzyer/readline 
 		fmt.Print("> ")
 		input := bufio.NewReader(os.Stdin)
 		line, err := input.ReadString('\n')
@@ -87,6 +89,7 @@ REPL:
 				fmt.Println("    /embed <file>          Embed a file into the system prompt")
 				fmt.Println("    /help                  Display this help")
 				fmt.Println("    /exit                  Exit the REPL")
+				// TODO: add /save and /load commands to save and load the history (JSON)
 			default:
 				fmt.Printf("Error: `%s` is not a valid REPL command\n", commandArgs[0])
 			}
@@ -99,6 +102,7 @@ REPL:
 				},
 				Stream: true,
 			}
+
 			stream, err := client.CreateChatCompletionStream(context.Background(), req)
 			if err != nil {
 				fmt.Printf("ChatCompletionStream error: %v\n", err)
@@ -112,7 +116,13 @@ REPL:
 					break
 				}
 
+				// TODO: add colored output
+				// github.com/fatih/color or github.com/mgutz/ansi
+				// TODO: render markdown
+				// github.com/charmbracelet/glamour
 				fmt.Printf(response.Choices[0].Delta.Content)
+				// TODO: allow to copy the response to clipboard
+				// github.com/atotto/clipboard
 			}
 			stream.Close()
 			fmt.Println()
