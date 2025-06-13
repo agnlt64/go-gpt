@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -11,11 +10,12 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/sashabaranov/go-openai"
+	"github.com/chzyer/readline"
 )
 
 const (
 	DEFAULT_SYSTEM_PROMPT = "You are a terminal-based chat assistant. Give relatively short answers, while being as accurate as possible."
-	HISTORY_PATH = "history.json"
+	DEFAULT_HISTORY_PATH = "history.json"
 )
 
 var (
@@ -55,19 +55,36 @@ func main() {
 
 	fmt.Println("GPT Client in Go. Use `/help` for help.")
 
+	completer := readline.NewPrefixCompleter(
+		readline.PcItem("/help"),
+		readline.PcItem("/exit"),
+		readline.PcItem("/embed"),
+		readline.PcItem("/system",
+			readline.PcItem("show"),
+			readline.PcItem("reset"),
+		),
+		readline.PcItem("/save"),
+		readline.PcItem("/load"),
+	)
+
+	rl, err := readline.NewEx(&readline.Config{
+		Prompt: ">",
+		AutoComplete: completer,
+		HistoryFile: "/tmp/gpt_repl_history.tmp",
+		InterruptPrompt: "^C",
+		EOFPrompt: "exit",
+	})
+	if err != nil {
+		log.Fatalf("readline error: %v", err)
+	}
+	defer rl.Close()
+
 REPL:
 	for running {
-		// TODO: add better prompt with readline
-		// github.com/chzyer/readline 
-		fmt.Print("> ")
-		input := bufio.NewReader(os.Stdin)
-		line, err := input.ReadString('\n')
-
+		line, err := rl.Readline()
 		if err != nil {
-			log.Fatalf("Erreur de lecture de l'entrée: %v", err)
+			break
 		}
-
-		line = strings.TrimSuffix(line, "\n")
 
 		if line[0] == '/' {
 			commandArgs := strings.Split(line[1:], " ")
@@ -111,7 +128,7 @@ REPL:
 				}
 			case "save":
 				if len(commandArgs) == 1 {
-					saveHistory(HISTORY_PATH)
+					saveHistory(DEFAULT_HISTORY_PATH)
 				} else if len(commandArgs) == 2 {
 					saveHistory(commandArgs[1])
 				} else {
@@ -119,7 +136,7 @@ REPL:
 				}
 			case "load":
 				if len(commandArgs) == 1 {
-					loadHistory(HISTORY_PATH)
+					loadHistory(DEFAULT_HISTORY_PATH)
 				} else if len(commandArgs) == 2 {
 					loadHistory(commandArgs[1])
 				} else {
