@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -14,7 +15,32 @@ import (
 
 const (
 	DEFAULT_SYSTEM_PROMPT = "You are a terminal-based chat assistant. Give relatively short answers, while being as accurate as possible."
+	HISTORY_PATH = "history.json"
 )
+
+var (
+	history []openai.ChatCompletionMessage
+)
+
+func saveHistory() {
+	data, err := json.MarshalIndent(history, "", "  ")
+	if err != nil {
+		fmt.Printf("Error saving `%s`", HISTORY_PATH)
+		return
+	}
+	os.WriteFile(HISTORY_PATH, data, 0644)
+	fmt.Printf("History saved to `%s`\n", HISTORY_PATH)
+}
+
+func loadHistory() {
+	data, err := os.ReadFile(HISTORY_PATH)
+	if err != nil {
+		fmt.Printf("Error reading `%s`", HISTORY_PATH)
+		return
+	}
+	json.Unmarshal(data, &history)
+	fmt.Printf("Loaded history from `%s`\n", HISTORY_PATH)
+}
 
 func main() {
 	err := godotenv.Load()
@@ -83,6 +109,10 @@ REPL:
 					systemPrompt = DEFAULT_SYSTEM_PROMPT
 					fmt.Println("System prompt has been reset")
 				}
+			case "save":
+				saveHistory()
+			case "load":
+				loadHistory()
 			case "help":
 				fmt.Println("Help:")
 				fmt.Println("    /system <show | reset> Manipulate the system prompt")
@@ -94,12 +124,21 @@ REPL:
 				fmt.Printf("Error: `%s` is not a valid REPL command\n", commandArgs[0])
 			}
 		} else {
+			history = append(history, openai.ChatCompletionMessage{
+				Role: "user",
+				Content: line,
+			})
+			messages := []openai.ChatCompletionMessage{
+				{Role: openai.ChatMessageRoleSystem, Content: systemPrompt},
+			}
+			messages = append(messages, history...)
+			messages = append(messages, openai.ChatCompletionMessage{
+				Role: openai.ChatMessageRoleUser,
+				Content: line,
+			})
 			req := openai.ChatCompletionRequest{
 				Model: openai.GPT4oMini,
-				Messages: []openai.ChatCompletionMessage{
-					{Role: openai.ChatMessageRoleSystem, Content: systemPrompt},
-					{Role: openai.ChatMessageRoleAssistant, Content: line},
-				},
+				Messages: messages,
 				Stream: true,
 			}
 
@@ -109,8 +148,9 @@ REPL:
 				return
 			}
 
+			chatResponse := strings.Builder{}
 			for {
-				response, err := stream.Recv()
+				streamResponse, err := stream.Recv()
 
 				if err != nil {
 					break
@@ -120,10 +160,16 @@ REPL:
 				// github.com/fatih/color or github.com/mgutz/ansi
 				// TODO: render markdown
 				// github.com/charmbracelet/glamour
-				fmt.Printf(response.Choices[0].Delta.Content)
+				chunk := streamResponse.Choices[0].Delta.Content
+				chatResponse.WriteString(chunk)
+				fmt.Print(chunk)
 				// TODO: allow to copy the response to clipboard
 				// github.com/atotto/clipboard
 			}
+			history = append(history, openai.ChatCompletionMessage{
+				Role: "assistant",
+				Content: chatResponse.String(),
+			})
 			stream.Close()
 			fmt.Println()
 		}
