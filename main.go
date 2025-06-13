@@ -22,24 +22,24 @@ var (
 	history []openai.ChatCompletionMessage
 )
 
-func saveHistory() {
+func saveHistory(path string) {
 	data, err := json.MarshalIndent(history, "", "  ")
 	if err != nil {
-		fmt.Printf("Error saving `%s`", HISTORY_PATH)
+		fmt.Printf("Error saving `%s`: %v", path, err)
 		return
 	}
-	os.WriteFile(HISTORY_PATH, data, 0644)
-	fmt.Printf("History saved to `%s`\n", HISTORY_PATH)
+	os.WriteFile(path, data, 0644)
+	fmt.Printf("History saved to `%s`\n", path)
 }
 
-func loadHistory() {
-	data, err := os.ReadFile(HISTORY_PATH)
+func loadHistory(path string) {
+	data, err := os.ReadFile(path)
 	if err != nil {
-		fmt.Printf("Error reading `%s`", HISTORY_PATH)
+		fmt.Printf("Error reading `%s`: %v", path, err)
 		return
 	}
 	json.Unmarshal(data, &history)
-	fmt.Printf("Loaded history from `%s`\n", HISTORY_PATH)
+	fmt.Printf("Loaded history from `%s`\n", path)
 }
 
 func main() {
@@ -110,16 +110,27 @@ REPL:
 					fmt.Println("System prompt has been reset")
 				}
 			case "save":
-				saveHistory()
+				if len(commandArgs) == 1 {
+					saveHistory(HISTORY_PATH)
+				} else if len(commandArgs) == 2 {
+					saveHistory(commandArgs[1])
+				} else {
+					fmt.Println("Error: `/save <path>` command expects only a file path")
+				}
 			case "load":
-				loadHistory()
+				if len(commandArgs) == 1 {
+					loadHistory(HISTORY_PATH)
+				} else if len(commandArgs) == 2 {
+					loadHistory(commandArgs[1])
+				} else {
+					fmt.Println("Error: `/load <path>` command expects only a file path")
+				}
 			case "help":
 				fmt.Println("Help:")
 				fmt.Println("    /system <show | reset> Manipulate the system prompt")
 				fmt.Println("    /embed <file>          Embed a file into the system prompt")
 				fmt.Println("    /help                  Display this help")
 				fmt.Println("    /exit                  Exit the REPL")
-				// TODO: add /save and /load commands to save and load the history (JSON)
 			default:
 				fmt.Printf("Error: `%s` is not a valid REPL command\n", commandArgs[0])
 			}
