@@ -11,6 +11,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/sashabaranov/go-openai"
 	"github.com/chzyer/readline"
+	"github.com/charmbracelet/glamour"
 )
 
 const (
@@ -183,21 +184,20 @@ REPL:
 				if err != nil {
 					break
 				}
-
-				// TODO: add colored output
-				// github.com/fatih/color or github.com/mgutz/ansi
-				// TODO: render markdown
-				// github.com/charmbracelet/glamour
 				chunk := streamResponse.Choices[0].Delta.Content
 				chatResponse.WriteString(chunk)
 				fmt.Print(chunk)
 				// TODO: allow to copy the response to clipboard
 				// github.com/atotto/clipboard
 			}
+			fullRes := chatResponse.String()
 			history = append(history, openai.ChatCompletionMessage{
 				Role: "assistant",
-				Content: chatResponse.String(),
+				Content: fullRes,
 			})
+			out, _ := glamour.Render(fullRes, "dark")
+			fmt.Println("\n--- Rendered Markdown ---")
+			fmt.Print(out)
 			stream.Close()
 			fmt.Println()
 		}
