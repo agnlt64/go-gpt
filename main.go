@@ -88,7 +88,14 @@ REPL:
 		}
 
 		if line[0] == '/' {
-			commandArgs := strings.Split(line[1:], " ")
+			commandArgs := []string{}
+
+			for _, str := range strings.Split(line[1:], " ") {
+				if str != "" {
+					commandArgs = append(commandArgs, str)
+				}
+			}
+
 			switch commandArgs[0] {
 			case "exit":
 				running = false
@@ -147,6 +154,8 @@ REPL:
 				fmt.Println("Help:")
 				fmt.Println("    /system <show | reset> Manipulate the system prompt")
 				fmt.Println("    /embed <file>          Embed a file into the system prompt")
+				fmt.Println("    /save <path>           Save the history to <path> (JSON format)")
+				fmt.Println("    /load <path>           Load the history from <path> (JSON format)")
 				fmt.Println("    /help                  Display this help")
 				fmt.Println("    /exit                  Exit the REPL")
 			default:
