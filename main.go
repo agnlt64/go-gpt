@@ -22,6 +22,15 @@ const (
 
 var (
 	history []openai.ChatCompletionMessage
+	replCommands = map[string][]string {
+		"/help": {},
+		"/exit": {},
+		"/system": { "show", "reset" },
+		"/embed": {},
+		"/copy": {},
+		"/save": {},
+		"/load": {},
+	}
 )
 
 func saveHistory(path string) {
@@ -44,6 +53,18 @@ func loadHistory(path string) {
 	fmt.Printf("Loaded history from `%s`\n", path)
 }
 
+func buildCompleter() *readline.PrefixCompleter {
+	pcCommands := []readline.PrefixCompleterInterface{}
+	for cmdString := range replCommands {
+		pcArgs := []readline.PrefixCompleterInterface{}
+		for _, arg := range replCommands[cmdString] {
+			pcArgs = append(pcArgs, readline.PcItem(arg))
+		}
+		pcCommands = append(pcCommands, readline.PcItem(cmdString, pcArgs...))
+	}
+	return readline.NewPrefixCompleter(pcCommands...)
+}
+
 func main() {
 	err := godotenv.Load()
 	if err != nil {
@@ -57,18 +78,7 @@ func main() {
 
 	fmt.Println("GPT Client in Go. Use `/help` for help.")
 
-	completer := readline.NewPrefixCompleter(
-		readline.PcItem("/help"),
-		readline.PcItem("/exit"),
-		readline.PcItem("/embed"),
-		readline.PcItem("/system",
-			readline.PcItem("show"),
-			readline.PcItem("reset"),
-		),
-		readline.PcItem("/copy"),
-		readline.PcItem("/save"),
-		readline.PcItem("/load"),
-	)
+	completer := buildCompleter()
 
 	rl, err := readline.NewEx(&readline.Config{
 		Prompt: ">",
