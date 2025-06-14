@@ -12,6 +12,7 @@ import (
 	"github.com/sashabaranov/go-openai"
 	"github.com/chzyer/readline"
 	"github.com/charmbracelet/glamour"
+	"github.com/atotto/clipboard"
 )
 
 const (
@@ -36,7 +37,7 @@ func saveHistory(path string) {
 func loadHistory(path string) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		fmt.Printf("Error reading `%s`: %v", path, err)
+		fmt.Printf("Error reading `%s`: %v\n", path, err)
 		return
 	}
 	json.Unmarshal(data, &history)
@@ -64,6 +65,7 @@ func main() {
 			readline.PcItem("show"),
 			readline.PcItem("reset"),
 		),
+		readline.PcItem("/copy"),
 		readline.PcItem("/save"),
 		readline.PcItem("/load"),
 	)
@@ -79,6 +81,8 @@ func main() {
 		log.Fatalf("readline error: %v", err)
 	}
 	defer rl.Close()
+
+	chatResponse := strings.Builder{}
 
 REPL:
 	for running {
@@ -150,12 +154,24 @@ REPL:
 				} else {
 					fmt.Println("Error: `/load <path>` command expects only a file path")
 				}
+			case "copy":
+				if chatResponse.Len() != 0 {
+					err := clipboard.WriteAll(chatResponse.String())
+					if err != nil {
+						fmt.Printf("Error writing to clipboard: %v", err)
+						continue
+					}
+					fmt.Println("LLM response copied to clipboard")
+				} else {
+					fmt.Println("Nothing to copy!")
+				}
 			case "help":
 				fmt.Println("Help:")
 				fmt.Println("    /system <show | reset> Manipulate the system prompt")
 				fmt.Println("    /embed <file>          Embed a file into the system prompt")
 				fmt.Println("    /save <path>           Save the history to <path> (JSON format)")
 				fmt.Println("    /load <path>           Load the history from <path> (JSON format)")
+				fmt.Println("    /copy                  Copy the last LLM response to clipboard")
 				fmt.Println("    /help                  Display this help")
 				fmt.Println("    /exit                  Exit the REPL")
 			default:
@@ -186,7 +202,7 @@ REPL:
 				return
 			}
 
-			chatResponse := strings.Builder{}
+			chatResponse.Reset()
 			for {
 				streamResponse, err := stream.Recv()
 
@@ -196,8 +212,6 @@ REPL:
 				chunk := streamResponse.Choices[0].Delta.Content
 				chatResponse.WriteString(chunk)
 				fmt.Print(chunk)
-				// TODO: allow to copy the response to clipboard
-				// github.com/atotto/clipboard
 			}
 			fullRes := chatResponse.String()
 			history = append(history, openai.ChatCompletionMessage{
