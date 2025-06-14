@@ -13,11 +13,11 @@ import (
 	"github.com/chzyer/readline"
 	"github.com/charmbracelet/glamour"
 	"github.com/atotto/clipboard"
+	"github.com/pelletier/go-toml"
 )
 
 const (
-	DEFAULT_SYSTEM_PROMPT = "You are a terminal-based chat assistant. Give relatively short answers, while being as accurate as possible."
-	DEFAULT_HISTORY_PATH = "history.json"
+	CONFIG_FILE = "gpt_config.toml"
 )
 
 var (
@@ -32,6 +32,13 @@ var (
 		"/load": {},
 	}
 )
+
+type Config struct {
+	Model string
+	RenderMarkdown bool
+	SystemPrompt string
+	DefaultHistoryPath string
+}
 
 func saveHistory(path string) {
 	data, err := json.MarshalIndent(history, "", "  ")
@@ -65,6 +72,21 @@ func buildCompleter() *readline.PrefixCompleter {
 	return readline.NewPrefixCompleter(pcCommands...)
 }
 
+func loadConfig() Config {
+	var config Config
+
+	data, err := os.ReadFile(CONFIG_FILE)
+	if err != nil {
+		log.Fatalf("Fatal error: can't load config file: %v", err)
+	}
+
+	if err := toml.Unmarshal(data, &config); err != nil {
+		log.Fatalf("Fatal error while reading config: %v", err)	
+	}
+
+	return config
+}
+
 func main() {
 	err := godotenv.Load()
 	if err != nil {
@@ -74,10 +96,11 @@ func main() {
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	client := openai.NewClient(apiKey)
 	running := true
-	systemPrompt := DEFAULT_SYSTEM_PROMPT
 
 	fmt.Println("GPT Client in Go. Use `/help` for help.")
 
+	config := loadConfig()
+	defaultSystemPrompt := config.SystemPrompt
 	completer := buildCompleter()
 
 	rl, err := readline.NewEx(&readline.Config{
@@ -132,7 +155,7 @@ REPL:
 					sb := strings.Builder{}
 					sb.WriteString(fmt.Sprintf("\nFile `%s`:\n", fileName))
 					sb.Write(content)
-					systemPrompt += sb.String()
+					config.SystemPrompt += sb.String()
 	
 					fmt.Printf("Added `%s` to system prompt\n", fileName)
 				}
@@ -143,14 +166,14 @@ REPL:
 				}
 				switch commandArgs[1] {
 				case "show":
-					fmt.Println(systemPrompt)
+					fmt.Println(config.SystemPrompt)
 				case "reset":
-					systemPrompt = DEFAULT_SYSTEM_PROMPT
+					config.SystemPrompt = defaultSystemPrompt
 					fmt.Println("System prompt has been reset")
 				}
 			case "save":
 				if len(commandArgs) == 1 {
-					saveHistory(DEFAULT_HISTORY_PATH)
+					saveHistory(config.DefaultHistoryPath)
 				} else if len(commandArgs) == 2 {
 					saveHistory(commandArgs[1])
 				} else {
@@ -158,7 +181,7 @@ REPL:
 				}
 			case "load":
 				if len(commandArgs) == 1 {
-					loadHistory(DEFAULT_HISTORY_PATH)
+					loadHistory(config.DefaultHistoryPath)
 				} else if len(commandArgs) == 2 {
 					loadHistory(commandArgs[1])
 				} else {
@@ -193,7 +216,7 @@ REPL:
 				Content: line,
 			})
 			messages := []openai.ChatCompletionMessage{
-				{Role: openai.ChatMessageRoleSystem, Content: systemPrompt},
+				{Role: openai.ChatMessageRoleSystem, Content: config.SystemPrompt},
 			}
 			messages = append(messages, history...)
 			messages = append(messages, openai.ChatCompletionMessage{
@@ -201,7 +224,7 @@ REPL:
 				Content: line,
 			})
 			req := openai.ChatCompletionRequest{
-				Model: openai.GPT4oMini,
+				Model: config.Model,
 				Messages: messages,
 				Stream: true,
 			}
@@ -228,9 +251,11 @@ REPL:
 				Role: "assistant",
 				Content: fullRes,
 			})
-			out, _ := glamour.Render(fullRes, "dark")
-			fmt.Println("\n--- Rendered Markdown ---")
-			fmt.Print(out)
+			if config.RenderMarkdown {
+				out, _ := glamour.Render(fullRes, "dark")
+				fmt.Println("\n--- Rendered Markdown ---")
+				fmt.Print(out)
+			}
 			stream.Close()
 			fmt.Println()
 		}
