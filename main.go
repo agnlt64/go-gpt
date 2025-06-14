@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"reflect"
 	"strings"
 
 	"github.com/atotto/clipboard"
@@ -28,6 +29,7 @@ var (
 		NewCommand("save", []string{"path"}, "Save the history to <path> (JSON format)"),
 		NewCommand("load", []string{"path"}, "Load the history from <path> (JSON format)"),
 		NewCommand("copy", []string{}, "Copy the last LLM response to clipboard"),
+		NewCommand("config", []string{}, "Show the config"),
 		NewCommand("help", []string{}, "Display this help"),
 		NewCommand("exit", []string{}, "Exit the REPL"),
 	}
@@ -102,9 +104,23 @@ func loadConfig() Config {
 	return config
 }
 
+func saveConfig(config Config) {
+	data, err := toml.Marshal(config)
+	if err != nil {
+		fmt.Printf("Error saving config: %v\n", err)
+		return
+	}
+	err = os.WriteFile(CONFIG_FILE, data, 0644)
+	if err != nil {
+		fmt.Printf("Error writing config file: %v\n", err)
+		return
+	}
+}
+
 func printCommandHelp(commands []Command, prefix string) {
 	commandStrings := buildCommandStrings(commands, prefix)
 	maxLength := findMaxLength(commandStrings)
+	fmt.Println("Help:")
 	printFormattedHelp(commands, commandStrings, maxLength)
 }
 
@@ -141,6 +157,14 @@ func printFormattedHelp(commands []Command, cmdStrings []string, maxLen int) {
 		padding := maxLen - len(cmdStrings[i]) + 1
 		fmt.Printf("%*s%s\n", padding, "", cmd.Description)
 	}
+}
+
+func printConfig(config Config) {
+	data, err := toml.Marshal(config)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(string(data))
 }
 
 func main() {
@@ -233,12 +257,12 @@ REPL:
 					fmt.Printf("Error: `%s%s <path>` command expects only a file path\n", config.CommandPrefix, action)
 					continue
 				}
-				
+
 				path := config.DefaultHistoryPath
 				if len(commandArgs) == 2 {
 					path = commandArgs[1]
 				}
-				
+
 				if action == "save" {
 					saveHistory(path)
 				} else {
@@ -255,8 +279,46 @@ REPL:
 				} else {
 					fmt.Println("Nothing to copy!")
 				}
+			case "config":
+				if len(commandArgs) == 1 {
+					printConfig(config)
+					continue
+				}
+				if len(commandArgs) != 3 {
+					fmt.Printf("Usage: %sconfig <Field> <Value>\n", config.CommandPrefix)
+					continue
+				}
+				field := commandArgs[1]
+				value := commandArgs[2]
+				updated := false
+				// Use reflection to set the field
+				cfgVal := reflect.ValueOf(&config).Elem()
+				cfgType := cfgVal.Type()
+				for i := range cfgVal.NumField() {
+					f := cfgType.Field(i)
+					if strings.EqualFold(f.Name, field) {
+						fieldVal := cfgVal.Field(i)
+						switch fieldVal.Kind() {
+						case reflect.Bool:
+							b := strings.EqualFold(value, "true") || value == "1"
+							fieldVal.SetBool(b)
+							updated = true
+						case reflect.String:
+							fieldVal.SetString(value)
+							updated = true
+						default:
+							fmt.Printf("Unsupported config field type: %s\n", f.Type.Name())
+						}
+						break
+					}
+				}
+				if updated {
+					saveConfig(config)
+					fmt.Printf("Config updated: %s = %s\n", field, value)
+				} else {
+					fmt.Printf("Unknown config field: %s\n", field)
+				}
 			case "help":
-				fmt.Println("Help:")
 				printCommandHelp(replCommands, config.CommandPrefix)
 			default:
 				fmt.Printf("Error: `%s` is not a valid REPL command\n", commandArgs[0])
