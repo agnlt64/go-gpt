@@ -16,4 +16,7 @@ Model = "gpt-4o-mini"
 RenderMarkdown = true
 DefaultHistoryPath = "history.json"
 SystemPrompt = "You are a terminal-based chat assistant. Give relatively short answers, while being as accurate as possible."
+CommandPrefix = "/"
+Theme = "dark"
 ```
+`CommandPrefix` must be a single character. `Theme` should be a valid [glamour](https://github.com/charmbracelet/glamour/tree/master/styles/gallery) theme.

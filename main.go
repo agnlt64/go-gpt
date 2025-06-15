@@ -38,6 +38,7 @@ var (
 type Config struct {
 	Model              string
 	RenderMarkdown     bool
+	Theme 			   string
 	SystemPrompt       string
 	DefaultHistoryPath string
 	CommandPrefix      string
@@ -365,7 +366,7 @@ REPL:
 				Content: fullRes,
 			})
 			if config.RenderMarkdown {
-				out, _ := glamour.Render(fullRes, "dark")
+				out, _ := glamour.Render(fullRes, config.Theme)
 				fmt.Println("\n--- Rendered Markdown ---")
 				fmt.Print(out)
 			}
