@@ -23,13 +23,16 @@ const (
 
 var (
 	history      []openai.ChatCompletionMessage
+	// TODO: add shortcuts (/q, /h, ...)
+	// TODO: add /summary
+	// TODO: add /export html | md
 	replCommands = []Command{
 		NewCommand("system", []string{"show", "reset"}, "Manipulate the system prompt"),
 		NewCommand("embed", []string{"file"}, "Embed a file into the system prompt"),
 		NewCommand("save", []string{"path"}, "Save the history to <path> (JSON format)"),
 		NewCommand("load", []string{"path"}, "Load the history from <path> (JSON format)"),
 		NewCommand("copy", []string{}, "Copy the last LLM response to clipboard"),
-		NewCommand("config", []string{}, "Show the config"),
+		NewCommand("config", []string{}, "Show / edit the config"),
 		NewCommand("help", []string{}, "Display this help"),
 		NewCommand("exit", []string{}, "Exit the REPL"),
 	}
@@ -38,7 +41,7 @@ var (
 type Config struct {
 	Model              string
 	RenderMarkdown     bool
-	Theme 			   string
+	Theme              string
 	SystemPrompt       string
 	DefaultHistoryPath string
 	CommandPrefix      string
@@ -253,6 +256,8 @@ REPL:
 					fmt.Println("System prompt has been reset")
 				}
 			case "save", "load":
+				// TODO: autocomplete file path
+				// TODO: underline file names
 				action := commandArgs[0]
 				if len(commandArgs) > 2 {
 					fmt.Printf("Error: `%s%s <path>` command expects only a file path\n", config.CommandPrefix, action)
