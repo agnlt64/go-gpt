@@ -28,6 +28,8 @@ go.work.sum
 # .idea/
 .vscode/
 
+gpt
+
 # chat history
 *.json
 *.toml
